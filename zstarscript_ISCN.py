@@ -168,12 +168,12 @@ if __name__ == "__main__":
     profdata    = pd.read_csv(pathh+proffn,encoding='iso-8859-1',index_col='profile_name')  
     uniqprofname = layerdata.index.unique()
 
-#    run exp fit    
-#    out_fitting_exp, out_prop_exp, \
-#        out_stat_exp, failed_exp = mainrun(layerdata, profdata, uniqprofname)
-#    out_stat_exp = np.array(out_stat_exp)
-#    out_prop_exp = np.array(out_prop_exp)
-#    np.savez('out_exp',out_stat_exp=out_stat_exp, out_prop_exp=out_prop_exp, failed_exp=failed_exp) 
+    # run exp fit    
+    out_fitting_exp, out_prop_exp, \
+        out_stat_exp, failed_exp = mainrun(layerdata, profdata, uniqprofname)
+    out_stat_exp = np.array(out_stat_exp)
+    out_prop_exp = np.array(out_prop_exp)
+    np.savez('out_exp',out_stat_exp=out_stat_exp, out_prop_exp=out_prop_exp, failed_exp=failed_exp) 
     
     # run linear fit
     out_fitting_lm, out_prop_lm, \
