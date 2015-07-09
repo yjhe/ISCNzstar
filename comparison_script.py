@@ -25,12 +25,33 @@ lmpcte = lmnpzfiles['out_stat_lm'][:,2]
 # plot historgram of all profiles that are fitted using exp vs. lm
 expr2cl = filter(lambda x:~np.isinf(x) and ~np.isnan(x) and x<1. and x>0., expr2)
 lmr2cl = filter(lambda x:~np.isinf(x) and ~np.isnan(x) and x<1. and x>0., lmr2)
+exprmsecl = filter(lambda x:~np.isinf(x) and ~np.isnan(x), exprmse)
+lmrmsecl = filter(lambda x:~np.isinf(x) and ~np.isnan(x), lmrmse)
+exppctecl = filter(lambda x:~np.isinf(x) and ~np.isnan(x), exppcte)
+lmpctecl = filter(lambda x:~np.isinf(x) and ~np.isnan(x), lmpcte)
 
+#  plot r2
 plt.hist(lmr2cl,bins=20,normed=1,alpha=0.5, cumulative=True,label='lm fit (N = ' + str(len(lmr2cl)) + ')')
 plt.hist(expr2cl,bins=20,normed=1,alpha=0.5, cumulative=True,label='exp fit (N = ' + str(len(expr2cl)) + ')')
 plt.gca().set_xlabel('r2')
 plt.gca().set_ylabel('cumulative Fraction (%)')
 plt.legend(loc=0)   
+
+# plot rmse
+
+plt.hist(lmrmsecl,bins=20,normed=1,alpha=0.5, cumulative=True,label='lm fit (N = ' + str(len(lmrmsecl)) + ')')
+plt.hist(exprmsecl,bins=20,normed=1,alpha=0.5, cumulative=True,label='exp fit (N = ' + str(len(exprmsecl)) + ')')
+plt.gca().set_xlabel('rmse')
+plt.gca().set_ylabel('cumulative Fraction (%)')
+plt.legend(loc=0)   
+
+# plot pcte
+plt.hist(lmpctecl,bins=20,normed=1,alpha=0.5, cumulative=True,label='lm fit (N = ' + str(len(lmpctecl)) + ')')
+plt.hist(exppctecl,bins=20,normed=1,alpha=0.5, cumulative=True,label='exp fit (N = ' + str(len(exppctecl)) + ')')
+plt.gca().set_xlabel('pcte')
+plt.gca().set_ylabel('cumulative Fraction (%)')
+plt.legend(loc=0)   
+
 
 #%% properties. z* etc.
 # plot z* using exp vs. lm

@@ -14,6 +14,10 @@ import matplotlib.pyplot as plt
 import pylab
 from numba import autojit
 import mystats as mysm
+import myplot as myplt
+import pandas as pd
+from scipy.optimize import curve_fit
+from scipy.stats import linregress
 
 #@autojit
 def expfunc(x, K, I):
@@ -48,7 +52,6 @@ def zstarfunc(depth, pctC, profid, profname, plott=0, exp=1):
             -3   : no avalable layer, in raw data
             -999 : optimization failed
     '''
-    from scipy.optimize import curve_fit
     print 'fit profile ', profid
     
     # define failure code
@@ -94,11 +97,19 @@ def zstarfunc(depth, pctC, profid, profname, plott=0, exp=1):
     z_r2        = mysm.cal_R2(fitC, yhat)
     z_rmse      = mysm.cal_RMSE(fitC, yhat)
     z_pcterr    = mysm.cal_pctERR(fitC, yhat)
+    slope, intercept, r_value, p_value, std_err = linregress(fitC, yhat)
+    act_Csurf   = fitC[0] # actual Csurf
+    ndp         = fitdepth.shape[0] # number of data points in fitting
+    d_org = 0 if Zsurf == depth[0] else Zsurf
+    d_tot       = depth[-1]  # total thickness
     if plott == 1:
-        return {'fitting':[yhat,fitC,fitdepth], 'prop':[profid,zstar,Csurf], 
-                'stat':[z_r2, z_rmse, z_pcterr]}
+        return {'fitting':[yhat,fitC,fitdepth], 
+                'prop':[profid,zstar,Csurf,act_Csurf,ndp,Cmin,Zmin,d_org,d_tot], 
+                'stat':[z_r2, z_rmse, z_pcterr, p_value]}
     else:
-        return {'prop':[profid,zstar,Csurf], 'stat':[z_r2, z_rmse, z_pcterr]}
+        return {'prop':[profid,zstar,Csurf,act_Csurf,ndp,Cmin,Zmin,d_org,d_tot], 
+                'stat':[z_r2, z_rmse, z_pcterr, p_value]}
+
         
 def mainrun(layerdata, profdata, uniqprofname, plott=0, ppf=9, **kwargs):
     '''
@@ -118,7 +129,7 @@ def mainrun(layerdata, profdata, uniqprofname, plott=0, ppf=9, **kwargs):
     out_prop    = []
     out_stat    = []
     failed      = []
-    for profid, profname in enumerate(uniqprofname):
+    for profid, profname in enumerate(uniqprofname[:100]):
         rawdepth    = np.array(layerdata.loc[profname]['layer_bot_cm'])
         rawpctCtot  = np.array(layerdata.loc[profname]['c_tot_percent'])
         rawpctCoc   = np.array(layerdata.loc[profname]['oc_percent'])
@@ -130,7 +141,7 @@ def mainrun(layerdata, profdata, uniqprofname, plott=0, ppf=9, **kwargs):
         depth = rawdepth[notNaNs]; pctC = rawpctC[notNaNs]
         if depth.shape[0] > 0:
             res = zstarfunc(depth, pctC, profid, profname, plott=plott, **kwargs)
-            if (not isinstance(res, float)) and (not isinstance(res, list)):
+            if (not isinstance(res, list)):
                 if plott != 0:
                     out_fitting.append(res['fitting'])
                     print 'plot profid: ', profid
@@ -139,29 +150,69 @@ def mainrun(layerdata, profdata, uniqprofname, plott=0, ppf=9, **kwargs):
                         fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(12,10))
                     ax = fig.axes[fign-1]
                     ax.invert_yaxis()
-                    ax.scatter(pctC, depth, label='obs', c='g')
-                    ax.plot(res['fitting'][:,0], res['fitting'][:,2], label='fitted')
+                    ax.scatter(pctC, depth-depth[pctC<20][0], label='obs', c='g')
+                    ax.plot(res['fitting'][0], res['fitting'][2], label='fitted')
                     ax.set_xlabel('pctC(%) ' + str(profid) + ':(' + profname + ')')
                     ax.set_ylabel('depth (cm)')
-                    plt.legend()
+                    txtprop = {'fontsize':9,'horizontalalignment':'left',
+                               'verticalalignment':'bottom','transform':ax.transAxes}
+                    ax.text(.7, .2, 'z* = %.2f'%(res['prop'][1]),**txtprop)
+                    ax.text(.7, .3, 'r2 = %.2f'%(res['stat'][0]),**txtprop)
+                    ax.text(.7, .4, 'rmse = %.2f'%(res['stat'][1]),**txtprop)
+                    ax.text(.7, .5, 'p-val = %.2f'%(res['stat'][3]),**txtprop)
+                    plt.legend(loc=2,fontsize=9)
                     #pylab.text(.8, .8, df.loc[profname]['ecoregion'],fontsize=8)
                     if fign == 0:
                         print 'save plot, profid ', profid
                         plt.tight_layout()
-                        fig.savefig(pathh + 'figures\\fig_%s.png'%(profid))    
+                        if 'exp' in kwargs and kwargs['exp'] == 0:
+                            fig.savefig(pathh + 'figures\\lmfit\\fig_%s.png'%(profid))   
+                        else:
+                            fig.savefig(pathh + 'figures\\expfit\\fig_%s.png'%(profid))   
                         plt.close()
                 out_prop.append(res['prop'])
                 out_stat.append(res['stat'])
             if isinstance(res, list):
                 failed.append(res)
+                if plott != 0:
+                    # still save or creat new fig when current profile failed
+                    if profid%ppf == 0:
+                        fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(10,8))
+                    fign = (profid+1)%ppf
+                    plt.legend(loc=2,fontsize=9)  
+                    plt.tight_layout()
+                    if fign == 0:
+                        print 'save plot, profid ', profid
+                        plt.tight_layout()
+                        if 'exp' in kwargs and kwargs['exp'] == 0:
+                            fig.savefig(pathh + 'figures\\lmfit\\fig_%s.png'%(profid))   
+                        else:
+                            fig.savefig(pathh + 'figures\\expfit\\fig_%s.png'%(profid))   
+                        plt.close()                    
         else:
             failed.append([norawly,profid])
+            if plott != 0:
+                # still save or creat new fig when current profile failed
+                if profid%ppf == 0:
+                    fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(10,8))
+                fign = (profid+1)%ppf
+                plt.legend(loc=2,fontsize=9)  
+                plt.tight_layout()
+                if fign == 0:
+                    print 'save plot, profid ', profid
+                    plt.tight_layout()
+                    if 'exp' in kwargs and kwargs['exp'] == 0:
+                        fig.savefig(pathh + 'figures\\lmfit\\fig_%s.png'%(profid))   
+                    else:
+                        fig.savefig(pathh + 'figures\\expfit\\fig_%s.png'%(profid))   
+                    plt.close()
     return out_fitting, out_prop, out_stat, failed
    
 #%%
 if __name__ == "__main__":
-    pathh       = 'C:\\download\\work\\!manuscripts\\C14_synthesis\\JenMeetingApr10_Zstar\\'
-    #pathh = 'C:\\Users\\happysk8er\\Google Drive\\manuscripts\\C14_synthesis\\JenMeetingApr10_Zstar\\'        
+    import pandas as pd
+    #pathh       = 'C:\\download\\work\\!manuscripts\\C14_synthesis\\JenMeetingApr10_Zstar\\'
+    pathh = 'C:\\Users\\happysk8er\\Google Drive\\manuscripts\\C14_synthesis\\JenMeetingApr10_Zstar\\'        
     layerfn     = 'ISCN datasets\\ISCNLayerData_LATEST.csv'
     proffn      = 'ISCN datasets\\ISCNProfileData_LATEST.csv'
     layerdata   = pd.read_csv(pathh+layerfn,encoding='iso-8859-1',index_col='profile_name')  
@@ -170,16 +221,24 @@ if __name__ == "__main__":
 
     # run exp fit    
     out_fitting_exp, out_prop_exp, \
-        out_stat_exp, failed_exp = mainrun(layerdata, profdata, uniqprofname)
+        out_stat_exp, failed_exp = mainrun(layerdata, profdata, uniqprofname, plott=0)
     out_stat_exp = np.array(out_stat_exp)
     out_prop_exp = np.array(out_prop_exp)
-    np.savez('out_exp',out_stat_exp=out_stat_exp, out_prop_exp=out_prop_exp, failed_exp=failed_exp) 
+    np.savez(pathh+'out_exp.npz',out_stat_exp=out_stat_exp, out_prop_exp=out_prop_exp, failed_exp=failed_exp) 
+    dum = np.c_[out_stat_exp, out_prop_exp]
+    df = pd.DataFrame(data=dum,
+                      columns=['r2','rmse','pcterr','p_val',
+                               'profid','zstar','Csurf_fit','Csurf_obs',
+                               'N','Cmin','Zmin','d_org','d_tot'])
+    tmp = np.array([i.encode('ascii','ignore') for i in uniqprofname])
+    df.insert(0,'prof_name',tmp[out_prop_exp[:,0].astype(int)])
+    df.to_csv(pathh+'ISCNzstar\\exp.csv',index=False)    
     
     # run linear fit
     out_fitting_lm, out_prop_lm, \
-        out_stat_lm, failed_lm = mainrun(layerdata, profdata, uniqprofname, exp=0)
+        out_stat_lm, failed_lm = mainrun(layerdata, profdata, uniqprofname, exp=0, plott=0)
     out_stat_lm = np.array(out_stat_lm)
     out_prop_lm = np.array(out_prop_lm)
     np.savez('out_lm',out_stat_lm=out_stat_lm, out_prop_lm=out_prop_lm, failed_lm=failed_lm) 
-    
-            
+
+
